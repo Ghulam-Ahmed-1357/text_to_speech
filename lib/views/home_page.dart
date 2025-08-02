@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
-import 'package:flutter_tts/flutter_tts_web.dart';
+import 'package:text_to_speech_app/utils/utils.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -9,9 +9,13 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
+enum TtsState { playing, stopped, paused, continued }
+
 class _HomePageState extends State<HomePage> {
   final TextEditingController textController = TextEditingController();
   final FlutterTts flutterTts = FlutterTts();
+  double? speechRate = 0.5;
+  List<double> speechRateList = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
   List<String> languages = [];
   String? selectedLanguage;
@@ -33,33 +37,45 @@ class _HomePageState extends State<HomePage> {
   Future<void> _initializeTTS() async {
     maxTextLength = await flutterTts.getMaxSpeechInputLength;
     final langs = await flutterTts.getLanguages;
-    languages = List<String>.from(langs);
+    // languages = List<String>.from(langs);
+    languages = langs.whereType<String>().toList();
 
     await flutterTts.awaitSpeakCompletion(true);
 
-    flutterTts.setStartHandler(() => setState(() {
-          ttsState = TtsState.playing;
-        }));
-    flutterTts.setCompletionHandler(() => setState(() {
-          ttsState = TtsState.stopped;
-          isSpeaking = false;
-          isPaused = false;
-        }));
-    flutterTts.setPauseHandler(() => setState(() {
-          ttsState = TtsState.paused;
-        }));
-    flutterTts.setContinueHandler(() => setState(() {
-          ttsState = TtsState.continued;
-        }));
-    flutterTts.setErrorHandler((msg) => setState(() {
-          ttsState = TtsState.stopped;
-          debugPrint('TTS Error: $msg');
-        }));
+    flutterTts.setStartHandler(
+      () => setState(() {
+        ttsState = TtsState.playing;
+      }),
+    );
+    flutterTts.setCompletionHandler(
+      () => setState(() {
+        ttsState = TtsState.stopped;
+        isSpeaking = false;
+        isPaused = false;
+      }),
+    );
+    flutterTts.setPauseHandler(
+      () => setState(() {
+        ttsState = TtsState.paused;
+      }),
+    );
+    flutterTts.setContinueHandler(
+      () => setState(() {
+        ttsState = TtsState.continued;
+      }),
+    );
+    flutterTts.setErrorHandler(
+      (msg) => setState(() {
+        ttsState = TtsState.stopped;
+        debugPrint('TTS Error: $msg');
+      }),
+    );
 
     setState(() => isLoading = false);
   }
 
   Future<void> _speak() async {
+    flutterTts.setSpeechRate(speechRate!);
     if (textController.text.trim().isNotEmpty) {
       await flutterTts.speak(textController.text.trim());
     }
@@ -106,6 +122,7 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.all(10),
               child: Column(
                 children: [
+                  const SizedBox(height: 20),
                   Container(
                     width: size.width * 0.9,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -113,26 +130,48 @@ class _HomePageState extends State<HomePage> {
                       border: Border.all(color: Colors.grey.shade400),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: DropdownButton<String>(
-                      hint: const Text('Select Language'),
-                      value: selectedLanguage,
-                      isExpanded: true,
-                      underline: const SizedBox(),
-                      items: languages
-                          .map((lang) => DropdownMenuItem(
-                                value: lang,
-                                child: Text(lang),
-                              ))
-                          .toList(),
-                      onChanged: (lang) {
-                        setState(() {
-                          selectedLanguage = lang;
-                          flutterTts.setLanguage(lang!);
-                        });
-                      },
+                    child: Opacity(
+                      opacity: isSpeaking ? 0.5 : 1.0,
+                      child: GestureDetector(
+                        onTap: isSpeaking
+                            ? () {
+                                Utils.showCustomSnackBar(
+                                  context,
+                                  'Please stop or pause the voice before changing language',
+                                  Colors.red,
+                                );
+                              }
+                            : null,
+                        child: AbsorbPointer(
+                          absorbing: isSpeaking,
+                          child: DropdownButton<String>(
+                            hint: const Text('Select Language'),
+                            value: selectedLanguage,
+                            isExpanded: true,
+                            underline: const SizedBox(),
+                            items: languages
+                                .map(
+                                  (lang) => DropdownMenuItem(
+                                    value: lang,
+                                    child: Text(lang),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (lang) {
+                              setState(() {
+                                selectedLanguage = lang;
+                                flutterTts.setLanguage(lang!);
+                                isButtonDisabled = textController.text
+                                    .trim()
+                                    .isEmpty;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 30),
                   TextField(
                     controller: textController,
                     minLines: 5,
@@ -150,9 +189,10 @@ class _HomePageState extends State<HomePage> {
                       });
 
                       if (value.length == maxTextLength) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Max characters limit reached')),
+                        Utils.showCustomSnackBar(
+                          context,
+                          'Max characters limit reached',
+                          Colors.red,
                         );
                       }
                     },
@@ -165,12 +205,21 @@ class _HomePageState extends State<HomePage> {
                         label: isPaused
                             ? 'Continue'
                             : isSpeaking
-                                ? 'Pause'
-                                : 'Play',
+                            ? 'Pause'
+                            : 'Play',
                         icon: isSpeaking ? Icons.pause : Icons.play_arrow,
                         onTap: isButtonDisabled
                             ? null
                             : () async {
+                                if (selectedLanguage == null) {
+                                  Utils.showCustomSnackBar(
+                                    context,
+                                    'Please select a language',
+                                    Colors.red,
+                                  );
+                                  return;
+                                }
+
                                 if (!isSpeaking && !isPaused) {
                                   setState(() {
                                     isSpeaking = true;
@@ -196,9 +245,58 @@ class _HomePageState extends State<HomePage> {
                       _buildActionButton(
                         label: 'Stop',
                         icon: Icons.stop,
-                        onTap: _stop,
+                        onTap: () {
+                          if (selectedLanguage == null) {
+                            Utils.showCustomSnackBar(
+                              context,
+                              'Please select a language',
+                              Colors.red,
+                            );
+                            return;
+                          }
+                          _stop();
+                        },
                         size: size,
-                        isDisabled: false,
+                        isDisabled: isButtonDisabled,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'Speed',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+
+                      Container(
+                        width: size.width * 0.3,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade400),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: DropdownButton<double>(
+                          value: speechRate,
+                          isExpanded: true,
+                          underline: const SizedBox(),
+                          items: speechRateList.map((double value) {
+                            return DropdownMenuItem(
+                              value: value,
+                              child: Text('$value'),
+                            );
+                          }).toList(),
+                          onChanged: (newRate) {
+                            setState(() {
+                              speechRate = newRate;
+                            });
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -232,9 +330,10 @@ class _HomePageState extends State<HomePage> {
             Text(
               label,
               style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16),
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
             ),
           ],
         ),
