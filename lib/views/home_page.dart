@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:text_to_speech_app/custom_widgets/action_button.dart';
 import 'package:text_to_speech_app/utils/utils.dart';
 
 class HomePage extends StatefulWidget {
@@ -105,7 +106,6 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -201,7 +201,7 @@ class _HomePageState extends State<HomePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildActionButton(
+                      ActionButton(
                         label: isPaused
                             ? 'Continue'
                             : isSpeaking
@@ -242,7 +242,7 @@ class _HomePageState extends State<HomePage> {
                         size: size,
                         isDisabled: isButtonDisabled,
                       ),
-                      _buildActionButton(
+                      ActionButton(
                         label: 'Stop',
                         icon: Icons.stop,
                         onTap: () {
@@ -303,41 +303,6 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required String label,
-    required IconData icon,
-    required VoidCallback? onTap,
-    required Size size,
-    required bool isDisabled,
-  }) {
-    return InkWell(
-      onTap: isDisabled ? null : onTap,
-      child: Container(
-        height: 50,
-        width: size.width * 0.32,
-        decoration: BoxDecoration(
-          color: isDisabled ? Colors.grey : Colors.black,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
