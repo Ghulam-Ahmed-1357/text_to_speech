@@ -10,7 +10,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-enum TtsState { playing, stopped, paused, continued }
+enum TtsState { playing, stopped, paused, resumed }
 
 class _HomePageState extends State<HomePage> {
   final TextEditingController textController = TextEditingController();
@@ -62,7 +62,7 @@ class _HomePageState extends State<HomePage> {
     );
     flutterTts.setContinueHandler(
       () => setState(() {
-        ttsState = TtsState.continued;
+        ttsState = TtsState.resumed;
       }),
     );
     flutterTts.setErrorHandler(
@@ -203,7 +203,7 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       ActionButton(
                         label: isPaused
-                            ? 'Continue'
+                            ? 'Resume'
                             : isSpeaking
                             ? 'Pause'
                             : 'Play',
@@ -273,7 +273,6 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       const SizedBox(width: 10),
-
                       Container(
                         width: size.width * 0.3,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -291,10 +290,17 @@ class _HomePageState extends State<HomePage> {
                               child: Text('$value'),
                             );
                           }).toList(),
-                          onChanged: (newRate) {
+                          onChanged: (newRate) async {
                             setState(() {
                               speechRate = newRate;
                             });
+
+                            flutterTts.setSpeechRate(speechRate!);
+
+                            if (isSpeaking) {
+                              await flutterTts.pause();
+                              await _speak();
+                            }
                           },
                         ),
                       ),
